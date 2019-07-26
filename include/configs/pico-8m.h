@@ -260,7 +260,9 @@
 
 #define CONFIG_IMX_BOOTAUX
 
+#ifndef CONFIG_CMD_MMC
 #define CONFIG_CMD_MMC
+#endif
 #define CONFIG_FSL_ESDHC
 #define CONFIG_FSL_USDHC
 
@@ -268,10 +270,18 @@
 #define CONFIG_SYS_FSL_ESDHC_ADDR       0
 
 #define CONFIG_DOS_PARTITION
+#ifndef CONFIG_CMD_EXT2
 #define CONFIG_CMD_EXT2
+#endif
+#ifndef CONFIG_CMD_EXT4
 #define CONFIG_CMD_EXT4
+#endif
+#ifndef CONFIG_CMD_EXT4_WRITE
 #define CONFIG_CMD_EXT4_WRITE
+#endif
+#ifndef CONFIG_CMD_FAT
 #define CONFIG_CMD_FAT
+#endif
 
 #define CONFIG_SUPPORT_EMMC_BOOT	/* eMMC specific */
 #define CONFIG_SYS_MMC_IMG_LOAD_PART	1
@@ -304,16 +314,23 @@
 #define CONFIG_HAS_FSL_XHCI_USB
 
 #ifdef CONFIG_HAS_FSL_XHCI_USB
+#ifndef CONFIG_USB_XHCI_IMX8M
 #define CONFIG_USB_XHCI_IMX8M
+#endif
 #define CONFIG_USB_XHCI_DWC3
+#ifndef CONFIG_USB_XHCI_HCD
 #define CONFIG_USB_XHCI_HCD
+#endif
 #define CONFIG_USB_MAX_CONTROLLER_COUNT         2
 #define CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS      2
 #endif
 
+#ifndef CONFIG_CMD_USB
 #define CONFIG_CMD_USB
+#endif
+#ifndef CONFIG_USB_STORAGE
 #define CONFIG_USB_STORAGE
-#define CONFIG_CMD_EXT2
+#endif
 
 #define CONFIG_USB_DWC3
 #define CONFIG_USB_DWC3_GADGET

@@ -27,6 +27,7 @@
 #include <spl.h>
 #include <usb.h>
 #include <dwc3-uboot.h>
+#include <i2c.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -80,9 +81,9 @@ int dram_init(void)
 	if (ddr_size == 0x4) {
 		/* rom_pointer[1] contains the size of TEE occupies */
 		if (rom_pointer[1])
-			gd->ram_size = PHYS_SDRAM_SIZE_3GB - rom_pointer[1];
+			gd->ram_size = PHYS_SDRAM_SIZE_4GB - rom_pointer[1];
 		else
-			gd->ram_size = PHYS_SDRAM_SIZE_3GB;
+			gd->ram_size = PHYS_SDRAM_SIZE_4GB;
 	}
 	else if (ddr_size == 0x3) {
 		/* rom_pointer[1] contains the size of TEE occupies */
@@ -175,6 +176,74 @@ static int setup_fec(void)
 	return set_clk_enet(ENET_125MHz);
 }
 
+#define I2C_MUX_RESET_PAD IMX_GPIO_NR(3, 3)
+#define I2C_MUX_CHIP_ADDR 0x70
+#define USB_HUB_CHIP_ADDR 0x2c
+static void setup_usb_hub(void)
+{
+	uint8_t hub_config_data[] = { 0x03, /* length of ransfer */
+				      0x93, 0x30, 0x00 };
+	uint8_t hub_enable_data[] = { 0x01, /* length of transfer */
+				      0x01, /* Enable HUB */ };
+	uint8_t mux_port = 0x01;
+
+	// Take I2C mux out of reset.
+	gpio_request(I2C_MUX_RESET_PAD, "i2c_mux_reset");
+	gpio_direction_output(I2C_MUX_RESET_PAD, 0);
+	udelay(500);
+	gpio_direction_output(I2C_MUX_RESET_PAD, 1);
+#ifdef CONFIG_DM_I2C_COMPAT
+	// Set to bus 2 since that is where the MUX and HUB are.
+	i2c_set_bus_num(2);
+
+	// Enable port 0 on the MUX.
+	i2c_write(I2C_MUX_CHIP_ADDR, 0x00, 0, &mux_port, 1);
+
+	// Write configuration to the HUB.
+	i2c_write(USB_HUB_CHIP_ADDR, 0x06, 0, hub_config_data, ARRAY_SIZE(hub_config_data));
+
+	// Enable the HUB
+	i2c_write(USB_HUB_CHIP_ADDR, 0xff, 0, hub_enable_data, ARRAY_SIZE(hub_enable_data));
+#else
+	struct udevice *muxChip;
+	struct udevice *hubChip;
+	
+	// Get MUX Chip
+	if (i2c_get_chip_for_busnum(2, I2C_MUX_CHIP_ADDR, 1, &muxChip) == -ENODEV)
+	{
+		puts("I2C MUX Not found!");
+		return;
+	}
+
+	// Enable port 0 on MUX.
+	if (dm_i2c_write(muxChip, 0x00, &mux_port, 1) != 0)
+	{
+		puts("Could not enable MUX port 0!");
+		return;
+	}
+
+	// Get HUB Chip
+	if (i2c_get_chip_for_busnum(2, USB_HUB_CHIP_ADDR, 1, &hubChip) == -ENODEV)
+	{
+		puts("USB HUB Not found on I2C bus 2!");
+		return;
+	}
+
+	// Write configuration to the HUB.
+	if (dm_i2c_write(hubChip, 0x06, hub_config_data, ARRAY_SIZE(hub_config_data)) != 0)
+	{
+		puts("Could not write HUB configuration!");
+		return;
+	}
+
+	// Enable the HUB
+	if (dm_i2c_write(hubChip, 0xff, hub_enable_data, ARRAY_SIZE(hub_enable_data)) != 0)
+	{
+		puts("Could not enable USB HUB!");
+		return;
+	}
+#endif
+}
 
 int board_phy_config(struct phy_device *phydev)
 {
@@ -331,6 +400,8 @@ int board_init(void)
 #ifdef CONFIG_FEC_MXC
 	setup_fec();
 #endif
+
+	setup_usb_hub();
 
 	return 0;
 }
